@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "TWOFISH.C": "cpp"
+        "TWOFISH.C": "cpp",
+        "twofish.h": "c",
+        "types.h": "c"
     }
 }

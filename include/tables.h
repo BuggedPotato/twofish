@@ -20,8 +20,8 @@ BYTE T_TABLES[2][4][16] = {
 };
 
 BYTE MDS[4][4] = {
-    { 01  EF  5B  5B },
-    { 5B  EF  EF  01 },
-    { EF  5B  01  EF },
-    { EF  01  EF  5B }
-}
+    { 0x01,  0xEF,  0x5B,  0x5B },
+    { 0x5B,  0xEF,  0xEF,  0x01 },
+    { 0xEF,  0x5B,  0x01,  0xEF },
+    { 0xEF,  0x01,  0xEF,  0x5B }
+};
