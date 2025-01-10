@@ -21,13 +21,17 @@ int ROUND = 0;
 
 typedef struct key {
     direction direction;
-    mode mode;
     int keyLength;
     char keyRaw[MAX_KEY_ASCII_SIZE];
     DWORD keyDWords[MAX_KEY_SIZE / 32];
     DWORD roundKeys[ROUND_KEYS];
     U_DWORD sBoxKeys[MAX_KEY_SIZE / 64];
 } keyObject;
+
+typedef struct cipher {
+    mode mode;
+    // DWORD iv[BLOCK_SIZE/32];
+} cipherObject;
 
 
 BYTE q( int perm, BYTE x );
@@ -200,5 +204,32 @@ void generateRoundKeys( keyObject *key ){
         key->roundKeys[2*i+1] = roundKey0.dword + 2*roundKey1.dword;
         key->roundKeys[2*i+1] = ROL32(key->roundKeys[2*i+1], 9);
     }
+}
+
+int initCipher( cipherObject cipher, mode mode ){
+    if( !cipher ){
+        perror("NULL cipher object in intit");
+    }
+    // TODO IV
+
+    cipher->mode = mode;
+    return 0;
+}
+
+int encryptBlock( cipherObject *cipher, keyObject *key, BYTE *input, int inputLength, BYTE *output ){
+
+    if( cipher->mode == CBC ){
+        // TODO IV
+    }
+
+    U_DWORD x[BLOCK_SIZE/4];
+    for( int n = 0; n < inputLength; n += BLOCK_SIZE ){
+        x[i]
+
+        input += BLOCK_SIZE / 8;
+        output += BLOCK_SIZE / 8;
+    }
+
+    return 0;
 }
 
