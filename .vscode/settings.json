@@ -2,6 +2,8 @@
     "files.associations": {
         "TWOFISH.C": "cpp",
         "twofish.h": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "TST2FISH.C": "cpp",
+        "errno.h": "c"
     }
 }

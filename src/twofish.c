@@ -4,13 +4,41 @@
 #include "../include/types.h"
 #include "../include/utils.h"
 #include "../include/tables.h"
+#include "../include/enums.h"
+
+#define MAX_ROUNDS 16
+
+#define BLOCK_SIZE 128
+// #define MIN_KEY_SIZE 128
+#define MAX_KEY_SIZE 256
+#define MAX_KEY_ASCII_SIZE 64
+#define ROUND_KEYS ( BLOCK_SIZE / 16 + 32 )
+
+#define RK_CONST 0x02020202u
+#define RK_CONST_SHIFT 0x01010101u
+
+int ROUND = 0;
+
+typedef struct key {
+    direction direction;
+    mode mode;
+    int keyLength;
+    char keyRaw[MAX_KEY_ASCII_SIZE];
+    DWORD keyDWords[MAX_KEY_SIZE / 32];
+    DWORD roundKeys[ROUND_KEYS];
+    U_DWORD sBoxKeys[MAX_KEY_SIZE / 64];
+} keyObject;
+
 
 BYTE q( int perm, BYTE x );
 DWORD h(U_DWORD wordX, U_DWORD * listL, int k);
 void PHT( DWORD *a, DWORD *b );
 
+/*
+    f function
+*/
 void f( DWORD r0, DWORD r1, DWORD *f0, DWORD *f1 ){
-    r1 <<= 8;
+    r1 = ROL32( r1, 8 );
     
 }
 
@@ -18,14 +46,17 @@ void f( DWORD r0, DWORD r1, DWORD *f0, DWORD *f1 ){
     Function h and g
     h generates keys to add to g output
 */
-DWORD h(U_DWORD wordX, U_DWORD * listL, int k){
+DWORD h(U_DWORD wordX, U_DWORD * listL, int keyLength){
     if( !listL ){
         errno = ENOMEM;
         perror("NULL pointer L list");
     }
+    int k = (keyLength + 63) / 64;
     BYTE y[4];
     // BYTE l[4][4];
     BYTE x[4];
+    for( int i = 0; i < k; i ++ )
+        x[i] = wordX.bytes[i];
     /*
     for( int i = 0; i < k; i ++ ){
         for( int j = 0; j < 4; j++ ){
@@ -45,7 +76,7 @@ DWORD h(U_DWORD wordX, U_DWORD * listL, int k){
             i--;
         }
     }
-
+    
     switch( k ){
         case 4:
             y[0] = q(1, y[0]) ^ listL[3].bytes[0];
@@ -108,3 +139,66 @@ void PHT( DWORD *a, DWORD *b ){
     *a = (aCopy + bCopy);
     *b = (aCopy + 2*bCopy);
 }
+
+
+void keyInit( keyObject *key, direction direction, int keyLength, char *keyRaw ){
+    if (key == NULL)			
+		perror("NULL key init");
+	if ( (direction != ENCRYPT) && (direction != DECRYPT) )
+		perror("Invalid direction");
+	if ( keyLength > MAX_KEY_SIZE || keyLength < 8 )	
+		perror("Invalid key length");
+	
+    key->direction = direction;
+    key->keyLength = (keyLength + 63) & ~63; // rounds up to multiple of 64
+    if( parseHex( keyLength, key->keyDWords, keyRaw ) )
+        perror("Invalid hexadecimal key material");
+    
+    generateRoundKeys(key);
+}
+
+void generateRoundKeys( keyObject *key ){
+    DWORD keyOdds[MAX_KEY_SIZE / 64];
+    DWORD keyEvens[MAX_KEY_SIZE / 64];
+
+    // int condition = (key->keyLength + 63) / 64;	// round up?
+    int condition = key->keyLength;
+    for( int i = 0; i < condition; i++ ){
+        keyOdds[i] = key->keyDWords[2*i];
+        keyEvens[i] = key->keyDWords[2*i+1];
+
+        // for RS multiplication
+        union {
+            BYTE bytes[8];
+            DWORD dwords[2];
+        } tmpKey;
+        tmpKey.dwords[0] = keyEvens[i];
+        tmpKey.dwords[1] = keyOdds[i];
+
+        // RS multiplication
+        key->sBoxKeys[i].dword = 0;
+        for( int j = 0; j < condition; j++ ){
+            for( int k = 0; k < 8; k++ ){
+                // reverse
+               key->sBoxKeys[condition-i-1].bytes[condition-j-1] += tmpKey.bytes[k] * RS[j][k];
+            }
+        }
+    }
+
+    // generate round keys
+    for( int i = 0; i < ROUND_KEYS/2; i++ ){
+        U_DWORD roundKey0, roundKey1;
+        U_DWORD i0, i1;
+        i0.dword = i*RK_CONST; // 2*i 
+        i1.dword = i*RK_CONST + RK_CONST_SHIFT; // 2*i+1
+        roundKey0.dword = h( i0, keyEvens, key->keyLength );
+        roundKey1.dword = h( i1, keyOdds, key->keyLength );
+        roundKey1.dword = ROL32( roundKey1.dword, 8 );
+        
+        // PHT
+        key->roundKeys[2*i] = roundKey0.dword + roundKey1.dword;
+        key->roundKeys[2*i+1] = roundKey0.dword + 2*roundKey1.dword;
+        key->roundKeys[2*i+1] = ROL32(key->roundKeys[2*i+1], 9);
+    }
+}
+
