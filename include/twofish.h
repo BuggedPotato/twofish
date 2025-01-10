@@ -1,5 +1,7 @@
 #pragma once
 #include "types.h"
-BYTE q( int perm, BYTE x );
-DWORD h(U_DWORD wordX, U_DWORD * listL, int k);
+#include "enums.h"
 void PHT( DWORD *a, DWORD *b );
+void keyInit( keyObject *key, direction direction, int keyLength, char *keyRaw );
+int initCipher( cipherObject *cipher, mode mode );
+int encryptBlock( cipherObject *cipher, keyObject *key, BYTE *input, int inputLength, BYTE *output );

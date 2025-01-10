@@ -5,52 +5,17 @@
 #include "../include/utils.h"
 #include "../include/tables.h"
 #include "../include/enums.h"
-
-#define MAX_ROUNDS 16
-
-#define BLOCK_SIZE 128
-// #define MIN_KEY_SIZE 128
-#define MAX_KEY_SIZE 256
-#define MAX_KEY_ASCII_SIZE 64
-#define ROUND_KEYS ( BLOCK_SIZE / 16 + 32 )
-
-#define RK_CONST 0x02020202u
-#define RK_CONST_SHIFT 0x01010101u
-
-int ROUND = 0;
-
-typedef struct key {
-    direction direction;
-    int keyLength;
-    char keyRaw[MAX_KEY_ASCII_SIZE];
-    DWORD keyDWords[MAX_KEY_SIZE / 32];
-    DWORD roundKeys[ROUND_KEYS];
-    U_DWORD sBoxKeys[MAX_KEY_SIZE / 64];
-} keyObject;
-
-typedef struct cipher {
-    mode mode;
-    // DWORD iv[BLOCK_SIZE/32];
-} cipherObject;
-
+#include "../include/constants.h"
 
 BYTE q( int perm, BYTE x );
-DWORD h(U_DWORD wordX, U_DWORD * listL, int k);
+U_DWORD h(U_DWORD wordX, U_DWORD * listL, int k);
 void PHT( DWORD *a, DWORD *b );
-
-/*
-    f function
-*/
-void f( DWORD r0, DWORD r1, DWORD *f0, DWORD *f1 ){
-    r1 = ROL32( r1, 8 );
-    
-}
 
 /*
     Function h and g
     h generates keys to add to g output
 */
-DWORD h(U_DWORD wordX, U_DWORD * listL, int keyLength){
+static U_DWORD h(U_DWORD wordX, U_DWORD * listL, int keyLength){
     if( !listL ){
         errno = ENOMEM;
         perror("NULL pointer L list");
@@ -108,10 +73,10 @@ DWORD h(U_DWORD wordX, U_DWORD * listL, int keyLength){
             z.bytes[i] ^= MDS[i][j] * y[j];
         }
     }
-    return z.dword;
+    return z;
 }
 
-BYTE q( int perm, BYTE x ){
+static BYTE q( int perm, BYTE x ){
     BYTE a0, b0;
     a0 = x >> 4;
     b0 = x % 16;
@@ -161,7 +126,7 @@ void keyInit( keyObject *key, direction direction, int keyLength, char *keyRaw )
     generateRoundKeys(key);
 }
 
-void generateRoundKeys( keyObject *key ){
+static void generateRoundKeys( keyObject *key ){
     DWORD keyOdds[MAX_KEY_SIZE / 64];
     DWORD keyEvens[MAX_KEY_SIZE / 64];
 
@@ -184,6 +149,7 @@ void generateRoundKeys( keyObject *key ){
         for( int j = 0; j < condition; j++ ){
             for( int k = 0; k < 8; k++ ){
                 // reverse
+                // TODO MAYBE ERROR index
                key->sBoxKeys[condition-i-1].bytes[condition-j-1] += tmpKey.bytes[k] * RS[j][k];
             }
         }
@@ -195,8 +161,8 @@ void generateRoundKeys( keyObject *key ){
         U_DWORD i0, i1;
         i0.dword = i*RK_CONST; // 2*i 
         i1.dword = i*RK_CONST + RK_CONST_SHIFT; // 2*i+1
-        roundKey0.dword = h( i0, keyEvens, key->keyLength );
-        roundKey1.dword = h( i1, keyOdds, key->keyLength );
+        roundKey0 = h( i0, keyEvens, key->keyLength );
+        roundKey1 = h( i1, keyOdds, key->keyLength );
         roundKey1.dword = ROL32( roundKey1.dword, 8 );
         
         // PHT
@@ -206,7 +172,7 @@ void generateRoundKeys( keyObject *key ){
     }
 }
 
-int initCipher( cipherObject cipher, mode mode ){
+int initCipher( cipherObject *cipher, mode mode ){
     if( !cipher ){
         perror("NULL cipher object in intit");
     }
@@ -218,13 +184,53 @@ int initCipher( cipherObject cipher, mode mode ){
 
 int encryptBlock( cipherObject *cipher, keyObject *key, BYTE *input, int inputLength, BYTE *output ){
 
+    if ( inputLength % BLOCK_SIZE ) // invalid input length
+            return 2;
+
     if( cipher->mode == CBC ){
         // TODO IV
     }
 
     U_DWORD x[BLOCK_SIZE/4];
-    for( int n = 0; n < inputLength; n += BLOCK_SIZE ){
-        x[i]
+    for( int block = 0; block < inputLength; block += BLOCK_SIZE ){
+        for( int i = 0; i < BLOCK_SIZE/32; i++ ){
+            x[i] = reverseBytes( ((U_DWORD *)input)[i] );
+            // input whitening
+            x[i].dword ^= key->roundKeys[i]; 
+            // TODO CBC
+
+            // main loop
+            U_DWORD r0, r1;
+            for( int round = 0; round < MAX_ROUNDS; round++ ){
+                // actually g funtions
+                r0 = h( x[0], key->sBoxKeys, key->keyLength );
+                r1.dword = ROL32(x[1].dword, 8);
+                r1 = h( r1, key->sBoxKeys, key->keyLength );
+
+                PHT( &r0.dword, &r1.dword );
+                r0.dword += key->roundKeys[2*round + 8];
+                r1.dword += key->roundKeys[2*round + 9];
+                x[3].dword = ROL32( x[3].dword, 1 );
+                r0.dword ^= x[2].dword;
+                r0.dword = ROR32( r0.dword, 1 );
+                r1.dword ^= x[3].dword;
+
+                // per round swap unless its last round
+                if( round < MAX_ROUNDS - 1 ){
+                    x[0] = r0;
+                    x[1] = r1;
+                    x[2] = x[0];
+                    x[3] = x[1];
+                }
+            }
+        }
+
+        for( int i = 0; i < BLOCK_SIZE/32; i++ ){
+            // output whitening
+            x[i].dword ^= key->roundKeys[BLOCK_SIZE/32 + i];
+            ((U_DWORD *)output)[i] = reverseBytes( x[i] );
+            // TODO CBC
+        }
 
         input += BLOCK_SIZE / 8;
         output += BLOCK_SIZE / 8;

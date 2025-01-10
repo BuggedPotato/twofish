@@ -55,3 +55,14 @@ int parseHex( int size, DWORD *dest, char *text ){
 
     return 0;
 }
+
+U_DWORD reverseBytes( U_DWORD x ){
+    int j = 3;
+    int k = 0;
+    BYTE tmp = x.bytes[k];
+    for( k = 0; k < j; k++ ){
+        x.bytes[k] = x.bytes[j];
+        x.bytes[j] = tmp;
+        j--;
+    }
+}
