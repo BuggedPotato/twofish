@@ -29,10 +29,12 @@ DWORD ROL32(DWORD val, int shift){
 }
 
 int parseHex( int size, DWORD *dest, char *text ){
-    if( !dest )
+    if( !dest ){
         perror("NULL dest while parsing");
+        return -1;
+    }
 
-    for( int i = 0; i * 8 < size; i++ )
+    for( int i = 0; i * 32 < size; i++ )
         dest[i] = 0;
         
     char c;
@@ -46,13 +48,9 @@ int parseHex( int size, DWORD *dest, char *text ){
 		else if ( c >= 'A' && c <= 'F' )
 			hexVal = c - 'A' + 10;
         else
-            return -1;
-
-        printf("shift: %d, hexVal: %X\n", (7 - i % 8), hexVal);
-        printf( "hexVal: %X\n", hexVal << (4 * (7 - i % 8)) );
-        dest[i/8] |= hexVal << (4 * (7 - i % 8));
+            return 1;
+        dest[i/8] |= hexVal << (4 * ((i ^ 1) & 7) ); // TODO
     }
-
     return 0;
 }
 
@@ -65,4 +63,5 @@ U_DWORD reverseBytes( U_DWORD x ){
         x.bytes[j] = tmp;
         j--;
     }
+    return x;
 }

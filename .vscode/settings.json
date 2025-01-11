@@ -4,6 +4,9 @@
         "twofish.h": "c",
         "types.h": "c",
         "TST2FISH.C": "cpp",
-        "errno.h": "c"
+        "errno.h": "c",
+        "constants.h": "c",
+        "utils.h": "c",
+        "stdio.h": "c"
     }
 }

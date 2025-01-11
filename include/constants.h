@@ -1,4 +1,6 @@
 #pragma once
+
+#define DEBUG 1
 #define MAX_ROUNDS 16
 
 #define BLOCK_SIZE 128

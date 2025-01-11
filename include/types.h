@@ -1,6 +1,7 @@
 #pragma once
 #include<stdint.h>
 #include "constants.h"
+#include "enums.h"
 
 #define BYTE uint8_t
 #define DWORD uint32_t
