@@ -210,18 +210,24 @@ static int generateRoundKeys( keyObject *key ){
     return 0;
 }
 
-int initCipher( cipherObject *cipher, mode mode, char *ivRaw ){
+int initCipher( cipherObject *cipher, mode mode, char *ivRaw, int ivLength ){
     if( !cipher ){
         perror("NULL cipher object in init");
         return 1;
     }
-    if( mode == CBC && ivRaw == NULL ){
-        perror( "no initialisation vector for CBC mode" );
-        return 2;
-    }
-    if( parseHex( BLOCK_SIZE, cipher->iv, ivRaw ) ){
-        perror("Invalid initialisation vector material");
+    if( mode == CBC ){
+        if( ivRaw == NULL ){
+            perror( "no initialisation vector for CBC mode" );
+            return 2;
+        }
+        if ( ivLength != BLOCK_SIZE ){
+		perror("Invalid initialisation vector length");
         return 3;
+        }
+        if( parseHex( ivLength, cipher->iv, ivRaw ) ){
+            perror("Invalid initialisation vector material");
+            return 4;
+        }
     }
     cipher->mode = mode;
     return 0;

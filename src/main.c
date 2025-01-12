@@ -35,6 +35,9 @@ int main(int argc, char *argv[]){
         exit(-1);
     }
 
+
+    int keyLength, ivLength;
+
     for( int i = 3; i < argc-1; i += 2 ){
         arg = argv[i];
         if( arg[0] != '-' ){
@@ -66,6 +69,7 @@ int main(int argc, char *argv[]){
             if( len > BLOCK_SIZE/4 )
                 len = BLOCK_SIZE/4;
             strncpy( ivRaw, argv[i+1], len );
+            ivLength = len * 4;
             ivRaw[BLOCK_SIZE/4] = '\0';
         }
         else if( strcmp(arg, "-k") == 0 ){
@@ -73,12 +77,12 @@ int main(int argc, char *argv[]){
             if( len > MAX_KEY_ASCII_SIZE )
                 len = MAX_KEY_ASCII_SIZE;
             strncpy( keyRaw, argv[i+1], len );
+            keyLength = len * 4;
             keyRaw[MAX_KEY_ASCII_SIZE] = '\0';
         }
 
     }
-    int keyLength = strlen(keyRaw) * 4; // bit length
-
+    
     FILE *inputFile = fopen( inputFileName, "rb" );
     if( inputFile == NULL ){
         errno = ENOENT;
@@ -98,7 +102,7 @@ int main(int argc, char *argv[]){
 
     keyObject key;
     cipherObject cipher;
-    if( initKey( &key, direction, keyLength, keyRaw ) || initCipher( &cipher, mode, ivRaw ) )
+    if( initKey( &key, direction, keyLength, keyRaw ) || initCipher( &cipher, mode, ivRaw, ivLength ) )
         safeExit(-1, inputFile, outputFile);
     
     int (*cipherFunction)(cipherObject *cipher, keyObject *key, int inputLength, BYTE *input, BYTE *output);
