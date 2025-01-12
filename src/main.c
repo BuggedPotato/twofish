@@ -10,10 +10,6 @@
 #define BUFFER_SIZE (BLOCK_SIZE / 8 * 4)
 
 int main(int argc, char *argv[]){
-    if( argc < 9 ){
-        perror("Not enough arguments");
-        exit(-1);
-    }
     /*
         arguments validation
     */
@@ -25,13 +21,25 @@ int main(int argc, char *argv[]){
     direction direction = ENCRYPT;
     mode mode = ECB;
 
+    if ( argc > 1 && strcmp(argv[1], "-h") == 0 ){
+        printf("Usage: main[.exe] input_file output_file ARGUMENTS\n" \
+        "Required arguments:\n\t-m [ebc|cbc]\n\t-d [e|d]\n\t-k [key]\n" \
+        "-m - algorithm mode of operation:\n\tEBC\n\tCBC\n-d - direction:\n\te = encrypt\n\td = decrypt\n" \
+        "-k - key for the algorithm made from 8-64 hexadecimal characters");
+        exit(0);
+    }
+    if( argc < 9 ){
+        perror("Not enough arguments");
+        exit(-1);
+    }
+
     for( int i = 3; i < argc-1; i += 2 ){
         arg = argv[i];
         if( arg[0] != '-' ){
             perror("Invalid arguments");
             exit(2);
         }
-        if ( strcmp(arg, "-d") == 0 ){
+        else if ( strcmp(arg, "-d") == 0 ){
             if( strcmp( argv[i+1], "e" ) == 0 )
                 direction = ENCRYPT;
             else if( strcmp( argv[i+1], "d" ) == 0 )
@@ -52,7 +60,7 @@ int main(int argc, char *argv[]){
             }
         }
         else if( strcmp(arg, "-k") == 0 ){
-            int len = strlen(argv[i+1]);
+            int len = strlen(argv[i+1]) + 1;
             if( len > MAX_KEY_ASCII_SIZE )
                 len = MAX_KEY_ASCII_SIZE;
             strncpy( keyRaw, argv[i+1], len );

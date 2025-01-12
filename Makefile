@@ -1,8 +1,7 @@
 srcDir = ./src
-all: encrypt decrypt
-encrypt: twofish.o utils.o $(srcDir)/encrypt.c
-	gcc -o encrypt $(srcDir)/encrypt.c twofish.o utils.o
-decrypt:
+all: main
+main: twofish.o utils.o $(srcDir)/main.c
+	gcc -o main $(srcDir)/main.c twofish.o utils.o
 twofish.o: $(srcDir)/twofish.c utils.o
 	gcc -c $(srcDir)/twofish.c
 utils.o: $(srcDir)/utils.c
