@@ -29,12 +29,12 @@ DWORD ROL32(DWORD val, int shift){
     return a | b;
 }
 
+// size in bits
 int parseHex( int size, DWORD *dest, char *text ){
     if( !dest ){
         perror("NULL dest while parsing");
         return -1;
     }
-
     for( int i = 0; i * 32 < size; i++ )
         dest[i] = 0;
         

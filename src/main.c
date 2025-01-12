@@ -18,14 +18,16 @@ int main(int argc, char *argv[]){
     char *arg;
 
     char keyRaw[MAX_KEY_ASCII_SIZE+1];
+    char ivRaw[BLOCK_SIZE/4+1];
     direction direction = ENCRYPT;
     mode mode = ECB;
 
     if ( argc > 1 && strcmp(argv[1], "-h") == 0 ){
         printf("Usage: main[.exe] input_file output_file ARGUMENTS\n" \
-        "Required arguments:\n\t-m [ebc|cbc]\n\t-d [e|d]\n\t-k [key]\n" \
-        "-m - algorithm mode of operation:\n\tEBC\n\tCBC\n-d - direction:\n\te = encrypt\n\td = decrypt\n" \
-        "-k - key for the algorithm made from 8-64 hexadecimal characters");
+        "Arguments:\n\t-m [ebc|cbc]\n\t-d [e|d]\n\t-k [key]\n\t-v [vector]\n" \
+        "-m - algorithm mode of operation:\n\tEBC\n\tCBC (requires the -v argument)\n-d - direction:\n\te = encrypt\n\td = decrypt\n" \
+        "-k - key for the algorithm made from 8-64 hexadecimal characters\n" \
+        "-v - initilisation vector used with CBC mode, %d hexadecimal characters\n", BLOCK_SIZE/4);
         exit(0);
     }
     if( argc < 9 ){
@@ -59,6 +61,13 @@ int main(int argc, char *argv[]){
                 exit(1);
             }
         }
+        else if( strcmp(arg, "-v") == 0 ){
+            int len = strlen(argv[i+1]) + 1;
+            if( len > BLOCK_SIZE/4 )
+                len = BLOCK_SIZE/4;
+            strncpy( ivRaw, argv[i+1], len );
+            ivRaw[BLOCK_SIZE/4] = '\0';
+        }
         else if( strcmp(arg, "-k") == 0 ){
             int len = strlen(argv[i+1]) + 1;
             if( len > MAX_KEY_ASCII_SIZE )
@@ -89,7 +98,7 @@ int main(int argc, char *argv[]){
 
     keyObject key;
     cipherObject cipher;
-    if( initKey( &key, direction, keyLength, keyRaw ) || initCipher( &cipher, mode ) )
+    if( initKey( &key, direction, keyLength, keyRaw ) || initCipher( &cipher, mode, ivRaw ) )
         safeExit(-1, inputFile, outputFile);
     
     int (*cipherFunction)(cipherObject *cipher, keyObject *key, int inputLength, BYTE *input, BYTE *output);

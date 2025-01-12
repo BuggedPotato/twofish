@@ -133,7 +133,6 @@ static DWORD getSBoxKey(DWORD k0,DWORD k1)
 }
 
 
-// TODO remove direction - unnecessary its in cipher anyway
 int initKey( keyObject *key, direction direction, int keyLength, char *keyRaw ){
     if (key == NULL){
 		perror("NULL key init");
@@ -211,13 +210,19 @@ static int generateRoundKeys( keyObject *key ){
     return 0;
 }
 
-int initCipher( cipherObject *cipher, mode mode ){
+int initCipher( cipherObject *cipher, mode mode, char *ivRaw ){
     if( !cipher ){
         perror("NULL cipher object in init");
         return 1;
     }
-    // TODO IV
-
+    if( mode == CBC && ivRaw == NULL ){
+        perror( "no initialisation vector for CBC mode" );
+        return 2;
+    }
+    if( parseHex( BLOCK_SIZE, cipher->iv, ivRaw ) ){
+        perror("Invalid initialisation vector material");
+        return 3;
+    }
     cipher->mode = mode;
     return 0;
 }
@@ -230,9 +235,6 @@ int encryptBlock( cipherObject *cipher, keyObject *key, int inputLength, BYTE *i
     if ( inputLength % BLOCK_SIZE ) // invalid input length
             return 2;
 
-    if( cipher->mode == CBC ){
-        // TODO IV
-    }
 
     U_DWORD x[BLOCK_SIZE/32];
     for( int block = 0; block < inputLength; block += BLOCK_SIZE ){
@@ -241,12 +243,14 @@ int encryptBlock( cipherObject *cipher, keyObject *key, int inputLength, BYTE *i
         #endif
         for( int i = 0; i < BLOCK_SIZE/32; i++ ){
             x[i] = ((U_DWORD *)input)[i];
+            if( cipher->mode == CBC ){
+                x[i].dword ^= cipher->iv[i];
+            }
             // input whitening
             x[i].dword ^= key->roundKeys[i]; 
             #if DEBUG
                 printf( "x[%d] = %08X\n", i, x[i].dword );
             #endif
-            // TODO CBC
         }
 
         // main loop
@@ -285,7 +289,9 @@ int encryptBlock( cipherObject *cipher, keyObject *key, int inputLength, BYTE *i
             // output whitening
             x[i].dword ^= key->roundKeys[BLOCK_SIZE/32 + i];
             ((U_DWORD *)output)[i] = x[i];
-            // TODO CBC
+            if( cipher->mode == CBC ){
+                cipher->iv[i] = (x[i].dword);
+            }
         }
 
         input += BLOCK_SIZE / 8;
@@ -298,10 +304,6 @@ int decryptBlock( cipherObject *cipher, keyObject *key, int inputLength, BYTE *i
 
     if ( inputLength % BLOCK_SIZE ) // invalid input length
             return 2;
-
-    if( cipher->mode == CBC ){
-        // TODO IV
-    }
 
     U_DWORD x[BLOCK_SIZE/32];
     for( int block = 0; block < inputLength; block += BLOCK_SIZE ){
@@ -354,6 +356,10 @@ int decryptBlock( cipherObject *cipher, keyObject *key, int inputLength, BYTE *i
         for( int i = 0; i < BLOCK_SIZE/32; i++ ){
             // output whitening
             x[i].dword ^= key->roundKeys[i];
+            if( cipher->mode == CBC ){
+                x[i].dword ^= cipher->iv[i];
+                cipher->iv[i] = ((DWORD *)input)[i];
+            }
             ((U_DWORD *)output)[i] = x[i];
             // TODO CBC
         }

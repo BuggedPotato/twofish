@@ -22,5 +22,5 @@ typedef struct key {
 
 typedef struct cipher {
     mode mode;
-    // DWORD iv[BLOCK_SIZE/32];
+    DWORD iv[BLOCK_SIZE/32];
 } cipherObject;
