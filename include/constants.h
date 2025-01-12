@@ -1,6 +1,6 @@
 #pragma once
 
-#define DEBUG 1
+#define DEBUG 0
 #define MAX_ROUNDS 16
 
 #define BLOCK_SIZE 128
@@ -10,3 +10,6 @@
 
 #define RK_CONST 0x02020202u
 #define RK_CONST_SHIFT 0x01010101u
+
+#define GF_256_PRIM_POLY 0b101101001
+#define GF_256_PRIM_POLY_NO_HIGH 0b01101001

@@ -10,7 +10,7 @@
 
 int main(int argc, char *argv[]){
 
-    FILE *inputFile = fopen( "input.txt", "rb" );
+    FILE *inputFile = fopen( "nightcall_ECB_cd0fd166775dc3f368aa41840482202c.bin", "rb" );
     if( inputFile == NULL ){
         errno = ENOENT;
         perror( "Could not open input file" );
@@ -28,17 +28,32 @@ int main(int argc, char *argv[]){
     memset( inputBuffer, 0, BUFFER_SIZE );
     memset( outputBuffer, 0, BUFFER_SIZE );
 
-    char keyRaw[MAX_KEY_ASCII_SIZE] = "6cec81cdb8e816dc3a5d97475fc52937";
+    char keyRaw[MAX_KEY_ASCII_SIZE] = "cd0fd166775dc3f368aa41840482202c";
     int keyLength = strlen(keyRaw) * 4; // bit length
+    direction direction = DECRYPT;
     keyObject key;
     cipherObject cipher;
-    initKey( &key, ENCRYPT, keyLength, keyRaw );
-    initCipher( &cipher, ENCRYPT );
+    initKey( &key, direction, keyLength, keyRaw );
+    initCipher( &cipher, ECB );
+    int (*cipherFunction)(cipherObject *cipher, keyObject *key, int inputLength, BYTE *input, BYTE *output);
+
+    switch (direction)
+    {
+        case ENCRYPT:
+            cipherFunction = encryptBlock;
+            break;
+        case DECRYPT:
+            cipherFunction = decryptBlock;
+        break;
+        default:
+            perror("Invalid direction");
+            break;
+    }
 
     int readBytes = 0;
     while( (readBytes = fread( inputBuffer, sizeof(BYTE), BUFFER_SIZE/8, inputFile )) != 0 ){
-        if( encryptBlock( &cipher, &key, BUFFER_SIZE, inputBuffer, outputBuffer ) ){
-            perror("encryption failed invalid input size");
+        if( cipherFunction( &cipher, &key, BUFFER_SIZE, inputBuffer, outputBuffer ) ){
+            perror("failed! invalid input size");
             fclose( inputFile );
             fclose( outputFile );
             exit(2);
@@ -46,20 +61,20 @@ int main(int argc, char *argv[]){
 
         #if DEBUG
             printf( "read bytes: %d\n", readBytes );
-            // printf( "read input:\n" );
-            // for( int i = 0; i < BUFFER_SIZE/8; i++ ){
-            //     printf( "%02X ", inputBuffer[i] );
-            //     if( (i+1) % 16 == 0 )
-            //         printf("\n");
-            // }
-            // printf("\n");
-            // printf( "written output:\n" );
-            // for( int i = 0; i < BUFFER_SIZE/8; i++ ){
-            //     printf( "%02X ", outputBuffer[i] );
-            //     if( (i+1) % 16 == 0 )
-            //         printf("\n");
-            // }
-            // printf("\n");
+            printf( "read input:\n" );
+            for( int i = 0; i < BUFFER_SIZE/8; i++ ){
+                printf( "%02X ", inputBuffer[i] );
+                if( (i+1) % 16 == 0 )
+                    printf("\n");
+            }
+            printf("\n");
+            printf( "written output:\n" );
+            for( int i = 0; i < BUFFER_SIZE/8; i++ ){
+                printf( "%02X ", outputBuffer[i] );
+                if( (i+1) % 16 == 0 )
+                    printf("\n");
+            }
+            printf("\n");
         #endif
         fwrite( outputBuffer, sizeof(BYTE), BUFFER_SIZE/8, outputFile );
         // fflush( outputFile );

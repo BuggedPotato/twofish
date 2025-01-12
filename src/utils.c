@@ -5,26 +5,26 @@
 circular bit shift
 */
 BYTE ROR4(BYTE val, int shift){
-    BYTE a = val >> shift;
-    BYTE b = val << (sizeof(val) * 8 - shift);
-    return a | b;
+    BYTE a = val >> shift % 4;
+    BYTE b = val << (sizeof(val) * 8 - shift) % 4;
+    return (a | b) & 0x0F;
 }
 
 BYTE ROL4(BYTE val, int shift){
-    BYTE a = val << shift;
-    BYTE b = val >> (sizeof(val) * 8 - shift);
-    return a | b;
+    BYTE a = val << shift % 4;
+    BYTE b = val >> (sizeof(val) * 8 - shift) % 4;
+    return (a | b) & 0x0F;;
 }
 
 DWORD ROR32(DWORD val, int shift){
-    DWORD a = val >> shift;
-    DWORD b = val << (sizeof(val) * 8 - shift);
+    DWORD a = val >> shift % 32;
+    DWORD b = val << (sizeof(val) * 8 - shift) % 32;
     return a | b;
 }
 
 DWORD ROL32(DWORD val, int shift){
-    DWORD a = val << shift;
-    DWORD b = val >> (sizeof(val) * 8 - shift);
+    DWORD a = val << shift % 32;
+    DWORD b = val >> (sizeof(val) * 8 - shift) % 32;
     return a | b;
 }
 
@@ -49,7 +49,7 @@ int parseHex( int size, DWORD *dest, char *text ){
 			hexVal = c - 'A' + 10;
         else
             return 1;
-        dest[i/8] |= hexVal << (4 * ((i ^ 1) & 7) ); // TODO
+        dest[i/8] |= hexVal << (4 * ((i ^ 1) % 8) );
     }
     return 0;
 }

@@ -9,6 +9,6 @@ typedef enum direction {
 
 // mode of operation
 typedef enum mode {
-    EBC,
+    ECB,
     CBC
 } mode;
