@@ -107,8 +107,8 @@ int main(int argc, char *argv[]){
             safeExit(3, inputFile, outputFile);
         }
 
-        printf( "read bytes: %d\n", readBytes );
         #if DEBUG
+            printf( "read bytes: %d\n", readBytes );
             printf( "read input:\n" );
             for( int i = 0; i < BUFFER_SIZE; i++ ){
                 printf( "%02X ", inputBuffer[i] );
@@ -124,11 +124,6 @@ int main(int argc, char *argv[]){
             }
             printf("\n");
         #endif
-        for( int i = 0; i < readBytes; i++ ){
-                printf( "%02X ", inputBuffer[i] );
-                if( (i+1) % 16 == 0 )
-                    printf("\n");
-            }
         fwrite( outputBuffer, sizeof(BYTE), BUFFER_SIZE, outputFile );
         memset( inputBuffer, 0, BUFFER_SIZE );
     }
