@@ -26,7 +26,7 @@ int main(int argc, char *argv[]){
         printf("Usage: main[.exe] input_file output_file ARGUMENTS\n" \
         "Arguments:\n\t-m [ebc|cbc]\n\t-d [e|d]\n\t-k [key]\n\t-v [vector]\n" \
         "-m - algorithm mode of operation:\n\tEBC\n\tCBC (requires the -v argument)\n-d - direction:\n\te = encrypt\n\td = decrypt\n" \
-        "-k - key for the algorithm made from 8-64 hexadecimal characters\n" \
+        "-k - key for the algorithm made from 4-64 hexadecimal characters\n" \
         "-v - initilisation vector used with CBC mode, %d hexadecimal characters\n", BLOCK_SIZE/4);
         exit(0);
     }
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]){
             if( len > BLOCK_SIZE/4 )
                 len = BLOCK_SIZE/4;
             strncpy( ivRaw, argv[i+1], len );
-            ivLength = len * 4;
+            ivLength = (len-1) * 4;
             ivRaw[BLOCK_SIZE/4] = '\0';
         }
         else if( strcmp(arg, "-k") == 0 ){
@@ -77,7 +77,7 @@ int main(int argc, char *argv[]){
             if( len > MAX_KEY_ASCII_SIZE )
                 len = MAX_KEY_ASCII_SIZE;
             strncpy( keyRaw, argv[i+1], len );
-            keyLength = len * 4;
+            keyLength = (len-1) * 4;
             keyRaw[MAX_KEY_ASCII_SIZE] = '\0';
         }
 
@@ -122,12 +122,13 @@ int main(int argc, char *argv[]){
     }
 
     int readBytes = 0;
+    int count = 0;
     while( (readBytes = fread( inputBuffer, sizeof(BYTE), BUFFER_SIZE, inputFile )) != 0 ){
         if( cipherFunction( &cipher, &key, BUFFER_SIZE*8, inputBuffer, outputBuffer ) ){
             perror("failed! invalid input size");
             safeExit(3, inputFile, outputFile);
         }
-
+        printf("Finished computing block %d\n", count);
         #if DEBUG
             printf( "read bytes: %d\n", readBytes );
             printf( "read input:\n" );
@@ -147,7 +148,9 @@ int main(int argc, char *argv[]){
         #endif
         fwrite( outputBuffer, sizeof(BYTE), BUFFER_SIZE, outputFile );
         memset( inputBuffer, 0, BUFFER_SIZE );
+        count++;
     }
+    printf("Succesfully finished %d blocks from file '%s'. Result saved to '%s'.\n", count, inputFileName, outputFileName);
 
     fclose( inputFile );
     fclose( outputFile );

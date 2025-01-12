@@ -150,6 +150,7 @@ int initKey( keyObject *key, direction direction, int keyLength, char *keyRaw ){
     key->direction = direction;
     key->keyLength = (keyLength + 63) & ~63; // rounds up to multiple of 64
     if( parseHex( keyLength, key->keyDWords, keyRaw ) ){
+        printf("%s %d\n", keyRaw, keyLength);
         perror("Invalid hexadecimal key material");
         return 4;
     }
