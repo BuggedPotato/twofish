@@ -65,3 +65,9 @@ U_DWORD reverseBytes( U_DWORD x ){
     }
     return x;
 }
+
+void safeExit(int code, FILE *input, FILE *output){
+    if( input ) fclose( input );
+    if( output ) fclose( output );
+    exit(code);
+}

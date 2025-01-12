@@ -9,7 +9,7 @@
 
 static BYTE q( int perm, BYTE x );
 void PHT( DWORD *a, DWORD *b );
-static void generateRoundKeys( keyObject *key );
+static int generateRoundKeys( keyObject *key );
 
 // multiplication in GF(256)
 DWORD GF256Mult(BYTE a, BYTE b){
@@ -35,6 +35,7 @@ U_DWORD h(U_DWORD wordX, U_DWORD *listL, int keyLength){
     if( !listL ){
         errno = ENOMEM;
         perror("NULL pointer L list");
+        exit(1);
     }
     int k = (keyLength + 63) / 64;
     BYTE y[4];
@@ -99,10 +100,10 @@ void PHT( DWORD *a, DWORD *b ){
     if( !a || !b ){
         errno = ENOMEM;
         perror( "NULL pointer in PHT" );
+        exit(errno);
     }
     DWORD aCopy = *a;
     DWORD bCopy = *b;
-    // modulo 2^32 taken care of by type limits
     *a = (aCopy + bCopy);
     *b = (aCopy + 2*bCopy);
 }
@@ -110,11 +111,8 @@ void PHT( DWORD *a, DWORD *b ){
 
 static DWORD RSRemainder(DWORD x){
     BYTE  b  = (BYTE) (x >> 24); /* MSB */
-	//   printf("b: %08X\n", b);
     DWORD g2 = ((b << 1) ^ ((b & 0x80) ? 0x14D : 0 )) & 0xFF;
-	//   printf("g2: %08X\n", g2);
     DWORD g3 = ((b >> 1) & 0x7F) ^ ((b & 1) ? 0x14D >> 1 : 0 ) ^ g2 ;
-	//   printf("g3: %08X\n", g3);
     return ((x << 8) ^ (g3 << 24) ^ (g2 << 16) ^ (g3 << 8) ^ b);
 }
 
@@ -136,18 +134,26 @@ static DWORD getSBoxKey(DWORD k0,DWORD k1)
 
 
 // TODO remove direction - unnecessary its in cipher anyway
-void initKey( keyObject *key, direction direction, int keyLength, char *keyRaw ){
-    if (key == NULL)			
+int initKey( keyObject *key, direction direction, int keyLength, char *keyRaw ){
+    if (key == NULL){
 		perror("NULL key init");
-	if ( (direction != ENCRYPT) && (direction != DECRYPT) )
+        return 1;
+    }		
+	if ( (direction != ENCRYPT) && (direction != DECRYPT) ){
 		perror("Invalid direction");
-	if ( keyLength > MAX_KEY_SIZE || keyLength < 8 )	
+        return 2;
+    }
+	if ( keyLength > MAX_KEY_SIZE || keyLength < 8 ){
 		perror("Invalid key length");
+        return 3;
+    }
 	
     key->direction = direction;
     key->keyLength = (keyLength + 63) & ~63; // rounds up to multiple of 64
-    if( parseHex( keyLength, key->keyDWords, keyRaw ) )
+    if( parseHex( keyLength, key->keyDWords, keyRaw ) ){
         perror("Invalid hexadecimal key material");
+        return 4;
+    }
 
     #if DEBUG
         printf("input key length: %d\n", keyLength);
@@ -157,14 +163,13 @@ void initKey( keyObject *key, direction direction, int keyLength, char *keyRaw )
         printf("\n");
     #endif
 
-    generateRoundKeys(key);
+    return generateRoundKeys(key);
 }
 
-static void generateRoundKeys( keyObject *key ){
+static int generateRoundKeys( keyObject *key ){
     DWORD keyOdds[MAX_KEY_SIZE / 64];
     DWORD keyEvens[MAX_KEY_SIZE / 64];
 
-    // int condition = (key->keyLength + 63) / 64;	// round up?
     int condition = key->keyLength / 64;
     for( int i = 0; i < condition; i++ ){
         keyEvens[i] = key->keyDWords[2*i];
@@ -203,11 +208,13 @@ static void generateRoundKeys( keyObject *key ){
             printf( "roundKeys[%d] = %08X\nroundKeys[%d] = %08X\n", 2*i, key->roundKeys[2*i], 2*i+1, key->roundKeys[2*i+1] );
         #endif
     }
+    return 0;
 }
 
 int initCipher( cipherObject *cipher, mode mode ){
     if( !cipher ){
         perror("NULL cipher object in init");
+        return 1;
     }
     // TODO IV
 

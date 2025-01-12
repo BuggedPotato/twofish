@@ -1,40 +1,89 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<errno.h>
+#include<ctype.h>
 #include<string.h>
 #include "../include/twofish.h"
 #include "../include/utils.h"
 #include "../include/types.h"
 
-#define BUFFER_SIZE 128
+#define BUFFER_SIZE (BLOCK_SIZE / 8 * 4)
 
 int main(int argc, char *argv[]){
+    if( argc < 9 ){
+        perror("Not enough arguments");
+        exit(-1);
+    }
+    /*
+        arguments validation
+    */
+    char *inputFileName = argv[1];
+    char *outputFileName = argv[2];
+    char *arg;
 
-    FILE *inputFile = fopen( "nightcall_ECB_cd0fd166775dc3f368aa41840482202c.bin", "rb" );
+    char keyRaw[MAX_KEY_ASCII_SIZE+1];
+    direction direction = ENCRYPT;
+    mode mode = ECB;
+
+    for( int i = 3; i < argc-1; i += 2 ){
+        arg = argv[i];
+        if( arg[0] != '-' ){
+            perror("Invalid arguments");
+            exit(2);
+        }
+        if ( strcmp(arg, "-d") == 0 ){
+            if( strcmp( argv[i+1], "e" ) == 0 )
+                direction = ENCRYPT;
+            else if( strcmp( argv[i+1], "d" ) == 0 )
+                direction = DECRYPT;
+            else{
+                perror("Invalid direction argument value");
+                exit(1);
+            }
+        }
+        else if( strcmp(arg, "-m") == 0 ){
+            if( strcmp( argv[i+1], "ecb" ) == 0 )
+                mode = ECB;
+            else if( strcmp( argv[i+1], "cbc" ) == 0 )
+                mode = CBC;
+            else{
+                perror("Invalid direction argument value");
+                exit(1);
+            }
+        }
+        else if( strcmp(arg, "-k") == 0 ){
+            int len = strlen(argv[i+1]);
+            if( len > MAX_KEY_ASCII_SIZE )
+                len = MAX_KEY_ASCII_SIZE;
+            strncpy( keyRaw, argv[i+1], len );
+            keyRaw[MAX_KEY_ASCII_SIZE] = '\0';
+        }
+
+    }
+    int keyLength = strlen(keyRaw) * 4; // bit length
+
+    FILE *inputFile = fopen( inputFileName, "rb" );
     if( inputFile == NULL ){
         errno = ENOENT;
         perror( "Could not open input file" );
         exit(errno);
     }
-    FILE *outputFile = fopen( "output.bin", "wb" );
+    FILE *outputFile = fopen( outputFileName, "wb" );
     if( outputFile == NULL ){
-        fclose( inputFile );
         errno = ENOENT;
         perror( "Could not open output file" );
-        exit(errno);
+        safeExit(errno, inputFile, outputFile);
     }
 
     BYTE inputBuffer[BUFFER_SIZE], outputBuffer[BUFFER_SIZE];
     memset( inputBuffer, 0, BUFFER_SIZE );
     memset( outputBuffer, 0, BUFFER_SIZE );
 
-    char keyRaw[MAX_KEY_ASCII_SIZE] = "cd0fd166775dc3f368aa41840482202c";
-    int keyLength = strlen(keyRaw) * 4; // bit length
-    direction direction = DECRYPT;
     keyObject key;
     cipherObject cipher;
-    initKey( &key, direction, keyLength, keyRaw );
-    initCipher( &cipher, ECB );
+    if( initKey( &key, direction, keyLength, keyRaw ) || initCipher( &cipher, mode ) )
+        safeExit(-1, inputFile, outputFile);
+    
     int (*cipherFunction)(cipherObject *cipher, keyObject *key, int inputLength, BYTE *input, BYTE *output);
 
     switch (direction)
@@ -47,38 +96,41 @@ int main(int argc, char *argv[]){
         break;
         default:
             perror("Invalid direction");
+            safeExit(2, inputFile, outputFile);
             break;
     }
 
     int readBytes = 0;
-    while( (readBytes = fread( inputBuffer, sizeof(BYTE), BUFFER_SIZE/8, inputFile )) != 0 ){
-        if( cipherFunction( &cipher, &key, BUFFER_SIZE, inputBuffer, outputBuffer ) ){
+    while( (readBytes = fread( inputBuffer, sizeof(BYTE), BUFFER_SIZE, inputFile )) != 0 ){
+        if( cipherFunction( &cipher, &key, BUFFER_SIZE*8, inputBuffer, outputBuffer ) ){
             perror("failed! invalid input size");
-            fclose( inputFile );
-            fclose( outputFile );
-            exit(2);
+            safeExit(3, inputFile, outputFile);
         }
 
+        printf( "read bytes: %d\n", readBytes );
         #if DEBUG
-            printf( "read bytes: %d\n", readBytes );
             printf( "read input:\n" );
-            for( int i = 0; i < BUFFER_SIZE/8; i++ ){
+            for( int i = 0; i < BUFFER_SIZE; i++ ){
                 printf( "%02X ", inputBuffer[i] );
                 if( (i+1) % 16 == 0 )
                     printf("\n");
             }
             printf("\n");
             printf( "written output:\n" );
-            for( int i = 0; i < BUFFER_SIZE/8; i++ ){
+            for( int i = 0; i < BUFFER_SIZE; i++ ){
                 printf( "%02X ", outputBuffer[i] );
                 if( (i+1) % 16 == 0 )
                     printf("\n");
             }
             printf("\n");
         #endif
-        fwrite( outputBuffer, sizeof(BYTE), BUFFER_SIZE/8, outputFile );
-        // fflush( outputFile );
-        memset( inputBuffer, 0, BUFFER_SIZE/8 );
+        for( int i = 0; i < readBytes; i++ ){
+                printf( "%02X ", inputBuffer[i] );
+                if( (i+1) % 16 == 0 )
+                    printf("\n");
+            }
+        fwrite( outputBuffer, sizeof(BYTE), BUFFER_SIZE, outputFile );
+        memset( inputBuffer, 0, BUFFER_SIZE );
     }
 
     fclose( inputFile );
