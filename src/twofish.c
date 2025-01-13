@@ -11,8 +11,8 @@ static BYTE q( int perm, BYTE x );
 void PHT( DWORD *a, DWORD *b );
 static int generateRoundKeys( keyObject *key );
 
-// multiplication in GF(256)
-DWORD GF256Mult(BYTE a, BYTE b){
+// multiplication in GF(256) over poly polynomial
+DWORD GF256Mult(BYTE a, BYTE b, DWORD poly){
     DWORD p = 0;
     BYTE carry = 0;
     for( int i = 0; i < 8 && a!= 0 && b != 0; i++ ){
@@ -22,7 +22,7 @@ DWORD GF256Mult(BYTE a, BYTE b){
         carry = a & 0b10000000; // leftmost bit
         a <<= 1;
         if( carry )
-            a ^= GF_256_PRIM_POLY_NO_HIGH;
+            a ^= poly;
     }
     return p;
 }
@@ -70,7 +70,7 @@ U_DWORD h(U_DWORD wordX, U_DWORD *listL, int keyLength){
     z.dword = 0;
     for( int i = 0; i < 4; i++ ){
         for( int j = 0; j < 4; j++ ){
-            z.dword ^= GF256Mult( MDS[i][j], y[j] ) << 8*i;
+            z.dword ^= GF256Mult( MDS[i][j], y[j], GF_256_PRIM_POLY_NO_HIGH ) << 8*i;
         }
     }
     return z;
@@ -107,31 +107,6 @@ void PHT( DWORD *a, DWORD *b ){
     *a = (aCopy + bCopy);
     *b = (aCopy + 2*bCopy);
 }
-
-
-static DWORD RSRemainder(DWORD x){
-    BYTE  b  = (BYTE) (x >> 24); /* MSB */
-    DWORD g2 = ((b << 1) ^ ((b & 0x80) ? 0x14D : 0 )) & 0xFF;
-    DWORD g3 = ((b >> 1) & 0x7F) ^ ((b & 1) ? 0x14D >> 1 : 0 ) ^ g2 ;
-    return ((x << 8) ^ (g3 << 24) ^ (g2 << 16) ^ (g3 << 8) ^ b);
-}
-
-/*
-    Use (12,8) Reed-Solomon code over GF(256) to produce
-    a key S-box dword from two key material dwords.
-*/
-static DWORD getSBoxKey(DWORD k0,DWORD k1)
-{
-    DWORD r = 0;
-    for ( int i = 0; i < 2; i++ )
-    {
-        r ^= i ? k0 : k1;	
-        for (int j = 0; j < 4; j++ )
-            r = RSRemainder(r);				
-    }
-    return r;
-}
-
 
 int initKey( keyObject *key, direction direction, int keyLength, char *keyRaw ){
     if (key == NULL){
@@ -174,8 +149,21 @@ static int generateRoundKeys( keyObject *key ){
     for( int i = 0; i < condition; i++ ){
         keyEvens[i] = key->keyDWords[2*i];
         keyOdds[i] = key->keyDWords[2*i+1];
+        // TODO REWORK
+        union{
+            BYTE b[8];
+            DWORD d[2];
+        } foo;
+        foo.d[0] = keyEvens[i];
+        foo.d[1] = keyOdds[i];
 
-        key->sBoxKeys[condition-i-1].dword = getSBoxKey( keyEvens[i], keyOdds[i] );
+        U_DWORD tmp[2] = {0, 0};
+        for( int n = 0; n < 4; n++ ){
+            for( int j = 0; j < 8; j++ ){
+                tmp[condition-i-1].dword ^= GF256Mult( RS[n][j], foo.b[j], RS_POLY ) << 8*n;
+            }
+        }
+        key->sBoxKeys[condition-i-1].dword = tmp[condition-i-1].dword;
     }
      #if DEBUG
             printf("key dwords even:\n");
@@ -242,7 +230,6 @@ int encryptBlock( cipherObject *cipher, keyObject *key, int inputLength, BYTE *i
     if ( inputLength % BLOCK_SIZE ) // invalid input length
             return 2;
 
-
     U_DWORD x[BLOCK_SIZE/32];
     for( int block = 0; block < inputLength; block += BLOCK_SIZE ){
         #if DEBUG
@@ -268,13 +255,9 @@ int encryptBlock( cipherObject *cipher, keyObject *key, int inputLength, BYTE *i
             r1.dword = ROL32(x[1].dword, 8);
             r1 = h( r1, key->sBoxKeys, key->keyLength );
 
-            #if DEBUG
-                printf( "r0: %08X, r1: %08X\n", r0.dword, r1.dword );
-            #endif
-
             PHT( &r0.dword, &r1.dword );
-            r0.dword += key->roundKeys[2*round + BLOCK_SIZE/16];
-            r1.dword += key->roundKeys[2*round + BLOCK_SIZE/16 + 1];
+            r0.dword += key->roundKeys[2*round + (BLOCK_SIZE >> 4)];
+            r1.dword += key->roundKeys[2*round + (BLOCK_SIZE >> 4) + 1];
             
             x[3].dword = ROL32( x[3].dword, 1 );
             x[2].dword ^= r0.dword;

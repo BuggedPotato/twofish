@@ -18,6 +18,7 @@ int main(int argc, char *argv[]){
     char *arg;
 
     char keyRaw[MAX_KEY_ASCII_SIZE+1];
+    memset( keyRaw, '0', MAX_KEY_ASCII_SIZE );
     char ivRaw[BLOCK_SIZE/4+1];
     direction direction = ENCRYPT;
     mode mode = ECB;
@@ -78,6 +79,11 @@ int main(int argc, char *argv[]){
                 len = MAX_KEY_ASCII_SIZE;
             strncpy( keyRaw, argv[i+1], len );
             keyLength = (len-1) * 4;
+            if( keyLength < 128 ){
+                keyRaw[len-1] = '0';
+                keyLength = 128;
+                keyRaw[keyLength / 4] = '\0';
+            }
             keyRaw[MAX_KEY_ASCII_SIZE] = '\0';
         }
 
@@ -129,7 +135,7 @@ int main(int argc, char *argv[]){
             safeExit(3, inputFile, outputFile);
         }
         printf("Finished computing block %d\n", count);
-        #if DEBUG
+        /*#if DEBUG
             printf( "read bytes: %d\n", readBytes );
             printf( "read input:\n" );
             for( int i = 0; i < BUFFER_SIZE; i++ ){
@@ -145,7 +151,7 @@ int main(int argc, char *argv[]){
                     printf("\n");
             }
             printf("\n");
-        #endif
+        #endif*/
         fwrite( outputBuffer, sizeof(BYTE), BUFFER_SIZE, outputFile );
         memset( inputBuffer, 0, BUFFER_SIZE );
         count++;
